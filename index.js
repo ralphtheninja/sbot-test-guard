@@ -2,25 +2,44 @@
 
 var spawn = require('child_process').spawn
 var fs = require('fs')
-var c = require('chalk')
+var chalk = require('chalk')
 var config = require('./config')
 var getProcessData = require('./get-process-data')
 
-function start() {
-  var sbot = spawn('sbot', [ 'server' ],  { stdio: 'inherit' })
-  console.log(c.yellow('started server with pid:'), sbot.pid)
+var crashCounter = 0
 
-  var timer = null
+var y = chalk.yellow
+var r = chalk.red
+
+function start() {
+  var sbot = spawn('sbot', [ 'server' ], { stdio: 'inherit' })
+  console.log(y('started server with pid:'), sbot.pid)
+
+  var probe_timer = null
 
   sbot.on('close', function (code) {
-    console.log(c.red('server closed with code:'), code)
-    process.nextTick(function () {
-      if (timer !== null) {
-        clearTimeout(timer)
-        timer = null
-      }
-      start()
-    })
+    console.log(r('server closed with code:'), code)
+    if (probe_timer !== null) {
+      clearTimeout(probe_timer)
+      probe_timer = null
+    }
+    if (crashCounter++ === 0) {
+      setTimeout(function () {
+        if (crashCounter >= config.crash.limit) {
+          console.error(r('sbot reached crash limit'),
+                        y('crashed'),
+                        crashCounter,
+                        y('times within'),
+                        config.crash.time_frame / 1000,
+                        y('seconds'))
+          process.exit(1)
+        }
+        else {
+          crashCounter = 0
+        }
+      }, config.crash.time_frame)
+    }
+    process.nextTick(start)
   })
 
   function postFeed(data, cb) {
@@ -33,22 +52,22 @@ function start() {
     })
   }
 
-  function measure() {
-    timer = setTimeout(function () {
+  function probe() {
+    probe_timer = setTimeout(function () {
       getProcessData(sbot, function (err, data) {
         if (!err) {
           return postFeed(data, function (err) {
-            if (err) console.error(c.red(err))
-            measure()
+            if (err) console.error(r(err))
+            probe()
           })
         }
-        console.error(c.red(err))
-        measure()
+        console.error(r(err))
+        probe()
       })
-    }, config.timer)
+    }, config.probe_timer)
   }
 
-  measure()
+  probe()
 
 }
 

@@ -1,3 +1,7 @@
 module.exports = require('rc')('sbot-test-guard', {
-  timer: 10000
+  probe_timer: 30000,
+  crash: {
+    limit: 2,
+    time_frame: 20000
+  }
 })
