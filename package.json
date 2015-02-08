@@ -22,10 +22,10 @@
   "dependencies": {
     "after": "^0.8.1",
     "chalk": "^0.5.1",
-    "proc-tools": "^1.0.0",
     "rc": "^0.6.0",
     "readable-stream": "^1.0.33",
     "split": "^0.3.3",
-    "through2": "^0.6.3"
+    "through2": "^0.6.3",
+    "usage": "~0.5.0"
   }
 }
