@@ -18,21 +18,10 @@ $ npm install sbot-test-guard -g
 
 ## Usage
 
-Update `lib/config.js` as needed:
+Set `.sbot-test-guardrc` as needed:
 
 ```js
-module.exports = require('rc')('sbot-test-guard', {
-  cmd: 'sbot server',          // command to run sbot
-  sample_timer: 30 * 1000,     // how frequently to sample, in ms
-  post_timer: 15 * 60 * 1000,  // how frequently to post the sample, in ms
-  restart_delay: 1000,         // how long to wait before restarting after a crash, in ms
-  startup_message_delay: 5000, // how long to wait before posting the dump after a crash, in ms
-  crash: {
-    limit: 2,
-    time_frame: 10000
-  }
-})
-
+cmd="sbot server"
 ```
 
 Start the guard.
