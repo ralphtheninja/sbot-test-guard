@@ -6,7 +6,7 @@ var chalk = require('chalk')
 var through = require('through2')
 var split = require('split')
 var config = require('./config')
-var getProcessData = require('./get-process-data')
+var sampleProcess = require('./sample-process')
 
 var crashCounter = 0
 
@@ -20,6 +20,9 @@ function start(startupMessage) {
 
   var errorLines = []
   var isParsingError = false
+  var lastSample = null
+  var sampleTimer = null
+  var postTimer = null
 
   sbot.stderr.pipe(split()).pipe(through(function (chunk, enc, cb) {
     var line = chunk.toString()
@@ -39,14 +42,9 @@ function start(startupMessage) {
     cb()
   })).pipe(fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' }))
 
-  var sample_timer = null
-
   sbot.on('close', function (code) {
     console.log(r('server closed with code:'), code)
-    if (sample_timer !== null) {
-      clearTimeout(sample_timer)
-      sample_timer = null
-    }
+    stopTimeouts()
     if (crashCounter++ === 0) {
       setTimeout(function () {
         if (crashCounter >= config.crash.limit) {
@@ -73,6 +71,7 @@ function start(startupMessage) {
 
   function postMessage(msg, cb) {
     var data = JSON.stringify(msg.data)
+    console.log(y('Posting data'), data)
     var args = [ 'add', '--type', msg.type, '--text' , data ]
     var child = spawn('sbot', args)
     child.on('close', function (code) {
@@ -82,19 +81,39 @@ function start(startupMessage) {
   }
 
   function sample() {
-    sample_timer = setTimeout(function () {
-      getProcessData(sbot, function (err, data) {
-        if (!err) {
-          var msg = { type: 'sys-stat', data: data }
-          return postMessage(msg, function (err) {
-            if (err) console.error(r(err))
-            sample()
-          })
-        }
-        console.error(r(err))
+    sampleTimer = setTimeout(function () {
+      sampleProcess(sbot.pid, function (err, data) {
+        if (!err) lastSample = data
+        console.log(g('Sampled data'), JSON.stringify(data))
         sample()
       })
     }, config.sample_timer)
+  }
+
+  function postSample() {
+    postTimer = setTimeout(function () {
+      var msg = { type: 'sys-stat', data: lastSample }
+      postMessage(msg, function (err) {
+        if (err) console.error(r(err))
+        postSample()
+      })
+    }, config.post_timer)
+  }
+
+  function startTimeouts() {
+    sample()
+    postSample()
+  }
+
+  function stopTimeouts() {
+    if (sampleTimer !== null) {
+      clearTimeout(sampleTimer)
+      sampleTimer = null
+    }
+    if (postTimer !== null) {
+      clearTimeout(postTimer)
+      sampleTimer = null
+    }
   }
 
   if (startupMessage) {
@@ -102,12 +121,12 @@ function start(startupMessage) {
     setTimeout(function () {
       postMessage(startupMessage, function (err) {
         if (err) console.error(r(err))
-        sample()
+        startTimeouts()
       })
     }, config.startup_message_delay)
   }
   else {
-    sample()
+    startTimeouts()
   }
 }
 

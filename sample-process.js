@@ -2,7 +2,7 @@ var os = require('os')
 var after = require('after')
 var status = require('proc-tools').status
 
-module.exports = function (sbot, cb) {
+module.exports = function (pid, cb) {
   var result = {}
 
   result.os = {
@@ -16,7 +16,7 @@ module.exports = function (sbot, cb) {
     cb(err, result)
   })
 
-  status(sbot.pid, function (err, data) {
+  status(pid, function (err, data) {
     result.process = data
     done()
   })

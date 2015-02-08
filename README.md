@@ -2,9 +2,10 @@
 
 Does the following:
 
-1. Runs a `scuttlebot` instance
-2. Measures data from the `sbot` process and writes that data to the feed
-3. Restarts `sbot` if it crashes or is killed
+* Runs a `scuttlebot` instance
+* Samples the `sbot` process and writes that data with message type `sys-stat`
+* Parses and saves `stderr` from `sbot` and writes that data with message type `error-dump`
+* Restarts `sbot` if it crashes or is killed
 
 It is assumed that `scuttlebot` is installed globally.
 
