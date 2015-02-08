@@ -1,6 +1,6 @@
 {
   "name": "sbot-test-guard",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "gathers sbot process data and uses sbot itself to report it",
   "main": "index.js",
   "homepage": "https://github.com/ralphtheninja/sbot-test-guard",
