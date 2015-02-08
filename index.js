@@ -18,14 +18,14 @@ function start(startupMessage) {
   var sbot = spawn('sbot', [ 'server' ])
   console.log(g('started server with pid:'), sbot.pid)
 
-  var errorMessage = ''
+  var errorLines = []
   var isParsingError = false
 
   sbot.stderr.pipe(split()).pipe(through(function (chunk, enc, cb) {
     var line = chunk.toString()
     if (isParsingError) {
       if (/^\s+at\s+\S+\s+\S+$/gi.test(line)) {
-        errorMessage += line + '\n'
+        errorLines.push(line)
       }
       else {
         isParsingError = false
@@ -33,7 +33,7 @@ function start(startupMessage) {
     }
     else if (/^Error:/.test(line)) {
       isParsingError = true
-      errorMessage += line + '\n'
+      errorLines.push(line)
     }
     this.push(chunk + '\n')
     cb()
@@ -65,7 +65,8 @@ function start(startupMessage) {
     }
 
     setTimeout(function () {
-      start(errorMessage)
+      if (!errorLines.length) return start()
+      start({ type: 'error', data: errorLines.join('/n') })
     }, config.restart_delay)
 
   })
@@ -85,7 +86,8 @@ function start(startupMessage) {
     probe_timer = setTimeout(function () {
       getProcessData(sbot, function (err, data) {
         if (!err) {
-          return postFeed(data, function (err) {
+          var msg = { type: 'status', data: data }
+          return postFeed(msg, function (err) {
             if (err) console.error(r(err))
             probe()
           })
@@ -96,7 +98,7 @@ function start(startupMessage) {
     }, config.probe_timer)
   }
 
-  if (startupMessage && startupMessage.length > 0) {
+  if (startupMessage) {
     console.log(g('startup error message, waiting before posting it'))
     setTimeout(function () {
       postFeed(startupMessage, function (err) {
