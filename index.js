@@ -7,6 +7,7 @@ var through = require('through2')
 var split = require('split')
 var config = require('./lib/config')
 var sampleProcess = require('./lib/sample-process')
+var parseStderr = require('./lib/parse-stderr.js')
 
 var crashCounter = 0
 
@@ -18,29 +19,15 @@ function start(startupMessage) {
   var sbot = spawn('sbot', [ 'server' ])
   console.log(g('started server with pid'), sbot.pid)
 
-  var errorLines = []
   var isParsingError = false
   var lastSample = null
   var sampleTimer = null
   var postTimer = null
 
-  sbot.stderr.pipe(split()).pipe(through(function (chunk, enc, cb) {
-    var line = chunk.toString()
-    if (isParsingError) {
-      if (/^\s+at\s+\S+\s+\S+$/gi.test(line)) {
-        errorLines.push(line)
-      }
-      else {
-        isParsingError = false
-      }
-    }
-    else if (/^Error:/.test(line)) {
-      isParsingError = true
-      errorLines.push(line)
-    }
-    this.push(chunk + '\n')
-    cb()
-  })).pipe(fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' }))
+  var parser = parseStderr()
+  var log = fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' })
+
+  sbot.stderr.pipe(parser).pipe(log)
 
   sbot.on('close', function (code) {
     console.log(r('server closed with code'), code)
@@ -63,8 +50,8 @@ function start(startupMessage) {
     }
 
     setTimeout(function () {
-      if (!errorLines.length) return start()
-      start({ type: 'error-dump', data: errorLines.join('/n') })
+      if (!parser.lastError) return start()
+      start({ type: 'error-dump', data: parser.lastError })
     }, config.restart_delay)
 
   })
@@ -117,7 +104,6 @@ function start(startupMessage) {
   }
 
   if (startupMessage) {
-    console.log(g('startup error message, waiting before posting it'))
     setTimeout(function () {
       postMessage(startupMessage, function (err) {
         if (err) console.error(r(err))
