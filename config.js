@@ -1,5 +1,5 @@
 module.exports = require('rc')('sbot-test-guard', {
-  probe_timer: 10000,
+  sample_timer: 15 * 60 * 1000,
   restart_delay: 1000,
   startup_message_delay: 5000,
   crash: {

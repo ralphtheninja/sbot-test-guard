@@ -39,13 +39,13 @@ function start(startupMessage) {
     cb()
   })).pipe(fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' }))
 
-  var probe_timer = null
+  var sample_timer = null
 
   sbot.on('close', function (code) {
     console.log(r('server closed with code:'), code)
-    if (probe_timer !== null) {
-      clearTimeout(probe_timer)
-      probe_timer = null
+    if (sample_timer !== null) {
+      clearTimeout(sample_timer)
+      sample_timer = null
     }
     if (crashCounter++ === 0) {
       setTimeout(function () {
@@ -66,15 +66,14 @@ function start(startupMessage) {
 
     setTimeout(function () {
       if (!errorLines.length) return start()
-      start({ type: 'error', data: errorLines.join('/n') })
+      start({ type: 'error-dump', data: errorLines.join('/n') })
     }, config.restart_delay)
 
   })
 
-  function postFeed(data, cb) {
-    data = JSON.stringify(data)
-    console.log(g('posting feed:'), data)
-    var args = [ 'add', '--type', 'post', '--text' , data ]
+  function postFeed(msg, cb) {
+    var data = JSON.stringify(msg.data)
+    var args = [ 'add', '--type', msg.type, '--text' , data ]
     var child = spawn('sbot', args)
     child.on('close', function (code) {
       if (code !== 0) return cb(new Error('failed to post feed'))
@@ -82,20 +81,20 @@ function start(startupMessage) {
     })
   }
 
-  function probe() {
-    probe_timer = setTimeout(function () {
+  function sample() {
+    sample_timer = setTimeout(function () {
       getProcessData(sbot, function (err, data) {
         if (!err) {
-          var msg = { type: 'status', data: data }
+          var msg = { type: 'sys-stat', data: data }
           return postFeed(msg, function (err) {
             if (err) console.error(r(err))
-            probe()
+            sample()
           })
         }
         console.error(r(err))
-        probe()
+        sample()
       })
-    }, config.probe_timer)
+    }, config.sample_timer)
   }
 
   if (startupMessage) {
@@ -103,12 +102,12 @@ function start(startupMessage) {
     setTimeout(function () {
       postFeed(startupMessage, function (err) {
         if (err) console.error(r(err))
-        probe()
+        sample()
       })
     }, config.startup_message_delay)
   }
   else {
-    probe()
+    sample()
   }
 }
 
