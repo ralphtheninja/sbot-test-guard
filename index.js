@@ -16,7 +16,7 @@ var g = chalk.green
 
 function start(startupMessage) {
   var sbot = spawn('sbot', [ 'server' ])
-  console.log(g('started server with pid:'), sbot.pid)
+  console.log(g('started server with pid'), sbot.pid)
 
   var errorLines = []
   var isParsingError = false
@@ -43,7 +43,7 @@ function start(startupMessage) {
   })).pipe(fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' }))
 
   sbot.on('close', function (code) {
-    console.log(r('server closed with code:'), code)
+    console.log(r('server closed with code'), code)
     stopTimeouts()
     if (crashCounter++ === 0) {
       setTimeout(function () {
@@ -71,7 +71,7 @@ function start(startupMessage) {
 
   function postMessage(msg, cb) {
     var data = JSON.stringify(msg.data)
-    console.log(y('Posting data'), data)
+    console.log(y('posting data'), data)
     var args = [ 'add', '--type', msg.type, '--text' , data ]
     var child = spawn('sbot', args)
     child.on('close', function (code) {
@@ -84,7 +84,7 @@ function start(startupMessage) {
     sampleTimer = setTimeout(function () {
       sampleProcess(sbot.pid, function (err, data) {
         if (!err) lastSample = data
-        console.log(g('Sampled data'), JSON.stringify(data))
+        console.log(g('sampled data'), JSON.stringify(data))
         sample()
       })
     }, config.sample_timer)
