@@ -3,6 +3,8 @@
 var spawn = require('child_process').spawn
 var fs = require('fs')
 var chalk = require('chalk')
+var through = require('through2')
+var split = require('split')
 var config = require('./config')
 var getProcessData = require('./get-process-data')
 
@@ -10,10 +12,32 @@ var crashCounter = 0
 
 var y = chalk.yellow
 var r = chalk.red
+var g = chalk.green
 
-function start() {
-  var sbot = spawn('sbot', [ 'server' ], { stdio: 'inherit' })
-  console.log(y('started server with pid:'), sbot.pid)
+function start(startupMessage) {
+  var sbot = spawn('sbot', [ 'server' ])
+  console.log(g('started server with pid:'), sbot.pid)
+
+  var errorMessage = ''
+  var isParsingError = false
+
+  sbot.stderr.pipe(split()).pipe(through(function (chunk, enc, cb) {
+    var line = chunk.toString()
+    if (isParsingError) {
+      if (/^\s+at\s+\S+\s+\S+$/gi.test(line)) {
+        errorMessage += line + '\n'
+      }
+      else {
+        isParsingError = false
+      }
+    }
+    else if (/^Error:/.test(line)) {
+      isParsingError = true
+      errorMessage += line + '\n'
+    }
+    this.push(chunk + '\n')
+    cb()
+  })).pipe(fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' }))
 
   var probe_timer = null
 
@@ -39,12 +63,17 @@ function start() {
         }
       }, config.crash.time_frame)
     }
-    process.nextTick(start)
+
+    setTimeout(function () {
+      start(errorMessage)
+    }, config.restart_delay)
+
   })
 
   function postFeed(data, cb) {
-    var args = [ 'add', '--type', 'post', '--text' ]
-    args.push(JSON.stringify(data))
+    data = JSON.stringify(data)
+    console.log(g('posting feed:'), data)
+    var args = [ 'add', '--type', 'post', '--text' , data ]
     var child = spawn('sbot', args)
     child.on('close', function (code) {
       if (code !== 0) return cb(new Error('failed to post feed'))
@@ -67,8 +96,18 @@ function start() {
     }, config.probe_timer)
   }
 
-  probe()
-
+  if (startupMessage && startupMessage.length > 0) {
+    console.log(g('startup error message, waiting before posting it'))
+    setTimeout(function () {
+      postFeed(startupMessage, function (err) {
+        if (err) console.error(r(err))
+        probe()
+      })
+    }, config.startup_message_delay)
+  }
+  else {
+    probe()
+  }
 }
 
 start()
