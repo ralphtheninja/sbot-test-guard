@@ -71,7 +71,7 @@ function start(startupMessage) {
 
   })
 
-  function postFeed(msg, cb) {
+  function postMessage(msg, cb) {
     var data = JSON.stringify(msg.data)
     var args = [ 'add', '--type', msg.type, '--text' , data ]
     var child = spawn('sbot', args)
@@ -86,7 +86,7 @@ function start(startupMessage) {
       getProcessData(sbot, function (err, data) {
         if (!err) {
           var msg = { type: 'sys-stat', data: data }
-          return postFeed(msg, function (err) {
+          return postMessage(msg, function (err) {
             if (err) console.error(r(err))
             sample()
           })
@@ -100,7 +100,7 @@ function start(startupMessage) {
   if (startupMessage) {
     console.log(g('startup error message, waiting before posting it'))
     setTimeout(function () {
-      postFeed(startupMessage, function (err) {
+      postMessage(startupMessage, function (err) {
         if (err) console.error(r(err))
         sample()
       })
