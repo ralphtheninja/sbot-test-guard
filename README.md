@@ -18,6 +18,12 @@ $ npm install sbot-test-guard -g
 
 ## Usage
 
+Set `.sbot-test-guardrc` as needed:
+
+```js
+cmd="sbot server"
+```
+
 Start the guard.
 
 ```

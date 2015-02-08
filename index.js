@@ -16,7 +16,9 @@ var r = chalk.red
 var g = chalk.green
 
 function start(startupMessage) {
-  var sbot = spawn('sbot', [ 'server' ])
+  var cmd = config.cmd || 'sbot server'
+  cmd = cmd.split(' ')
+  var sbot = spawn(cmd[0], cmd.slice(1))
   console.log(g('started server with pid'), sbot.pid)
 
   var isParsingError = false
