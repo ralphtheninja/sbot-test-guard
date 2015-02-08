@@ -5,8 +5,8 @@ var fs = require('fs')
 var chalk = require('chalk')
 var through = require('through2')
 var split = require('split')
-var config = require('./config')
-var sampleProcess = require('./sample-process')
+var config = require('./lib/config')
+var sampleProcess = require('./lib/sample-process')
 
 var crashCounter = 0
 
