@@ -18,31 +18,25 @@ var g = chalk.green
 function start(startupMessage) {
   var cmd = config.cmd || 'sbot server'
   cmd = cmd.split(' ')
-  var sbot = spawn(cmd[0], cmd.slice(1))
-  console.log(g('started server with pid'), sbot.pid)
+  var sbot = spawn(cmd[0], cmd.slice(1), { stdio: 'inherit' })
+  info('sbot started (' + sbot.pid + ')')
 
-  var isParsingError = false
   var lastSample = null
   var sampleTimer = null
   var postTimer = null
 
   var parser = parseStderr()
   var log = fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' })
-
-  sbot.stderr.pipe(parser).pipe(log)
+  process.stderr.pipe(parser).pipe(log)
 
   sbot.on('close', function (code) {
-    console.log(r('server closed with code'), code)
+    error('sbot exited (' + code + ')')
     stopTimeouts()
     if (crashCounter++ === 0) {
       setTimeout(function () {
         if (crashCounter >= config.crash.limit) {
-          console.error(r('sbot reached crash limit'),
-                        y('crashed'),
-                        crashCounter,
-                        y('times within'),
-                        config.crash.time_frame / 1000,
-                        y('seconds'))
+          error('sbot crashed', crashCounter, 'times within',
+                config.crash.time_frame / 1000, 'seconds')
           process.exit(1)
         }
         else {
@@ -60,7 +54,7 @@ function start(startupMessage) {
 
   function postMessage(msg, cb) {
     var data = JSON.stringify(msg.data)
-    console.log(y('posting data'), data)
+    info('posting', data)
     var args = [ 'add', '--type', msg.type, '--text' , data ]
     var child = spawn('sbot', args)
     child.on('close', function (code) {
@@ -71,9 +65,10 @@ function start(startupMessage) {
 
   function sample() {
     sampleTimer = setTimeout(function () {
+      info('sampling')
       sampleProcess(sbot.pid, function (err, data) {
-        if (!err) lastSample = data
-        console.log(g('sampled data'), JSON.stringify(data))
+        if (err) error(err)
+        else lastSample = data
         sample()
       })
     }, config.sample_timer)
@@ -83,7 +78,7 @@ function start(startupMessage) {
     postTimer = setTimeout(function () {
       var msg = { type: 'sys-stat', data: lastSample }
       postMessage(msg, function (err) {
-        if (err) console.error(r(err))
+        if (err) error(err)
         postSample()
       })
     }, config.post_timer)
@@ -108,13 +103,28 @@ function start(startupMessage) {
   if (startupMessage) {
     setTimeout(function () {
       postMessage(startupMessage, function (err) {
-        if (err) console.error(r(err))
+        if (err) error(err)
         startTimeouts()
       })
     }, config.startup_message_delay)
   }
   else {
     startTimeouts()
+  }
+}
+
+function info() {
+  output('green').apply(null, arguments)
+}
+
+function error() {
+  output('red').apply(null, arguments)
+}
+
+function output(color) {
+  return function () {
+    var str = ' ' + [].slice.apply(arguments).join(' ') + ' '
+    console.log(chalk.inverse[color](' GUARD ') + chalk.inverse(str))
   }
 }
 
