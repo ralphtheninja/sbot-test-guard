@@ -2,3 +2,4 @@ node_modules/
 .gitmodules
 test/tmp/
 sbot.log
+data.json

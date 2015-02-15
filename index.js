@@ -5,15 +5,13 @@ var fs = require('fs')
 var chalk = require('chalk')
 var through = require('through2')
 var split = require('split')
+
 var config = require('./lib/config')
 var sampleProcess = require('./lib/sample-process')
 var parseStderr = require('./lib/parse-stderr.js')
+var rpcAdd = require('./lib/rpc-add.js')
 
 var crashCounter = 0
-
-var y = chalk.yellow
-var r = chalk.red
-var g = chalk.green
 
 function start(startupMessage) {
   var cmd = config.cmd || 'sbot server'
@@ -47,20 +45,14 @@ function start(startupMessage) {
 
     setTimeout(function () {
       if (!parser.lastError) return start()
-      start({ type: 'error-dump', data: parser.lastError })
+      start({ type: 'error-dump', text: parser.lastError })
     }, config.restart_delay)
 
   })
 
   function postMessage(msg, cb) {
-    var data = JSON.stringify(msg.data)
-    info('posting', data)
-    var args = [ 'add', '--type', msg.type, '--text' , data ]
-    var child = spawn('sbot', args)
-    child.on('close', function (code) {
-      if (code !== 0) return cb(new Error('failed to post feed'))
-      cb()
-    })
+    info('posting', JSON.stringify(msg))
+    rpcAdd(msg, cb)
   }
 
   function sample() {
@@ -76,7 +68,7 @@ function start(startupMessage) {
 
   function postSample() {
     postTimer = setTimeout(function () {
-      var msg = { type: 'sys-stat', data: lastSample }
+      var msg = { type: 'sys-stat', text: lastSample }
       postMessage(msg, function (err) {
         if (err) error(err)
         postSample()
