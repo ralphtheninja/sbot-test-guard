@@ -3,29 +3,51 @@
 var spawn = require('child_process').spawn
 var fs = require('fs')
 var chalk = require('chalk')
-var through = require('through2')
 var split = require('split')
 
 var config = require('./lib/config')
 var sampleProcess = require('./lib/sample-process')
 var parseStderr = require('./lib/parse-stderr.js')
-var rpcAdd = require('./lib/rpc-add.js')
+var createClient = require('./lib/rpc.js')
+var match = require('match-through')
 
 var crashCounter = 0
 
 function start(startupMessage) {
   var cmd = config.cmd || 'sbot server'
   cmd = cmd.split(' ')
-  var sbot = spawn(cmd[0], cmd.slice(1), { stdio: 'inherit' })
+  var sbot = spawn(cmd[0], cmd.slice(1))
   info('sbot started (' + sbot.pid + ')')
+
+  process.on('uncaughtException', function (err) {
+    error('uncaught exception', err)
+    sbot.kill()
+    process.exit(1)
+  })
 
   var lastSample = null
   var sampleTimer = null
   var postTimer = null
+  var rpcClient = null
 
   var parser = parseStderr()
   var log = fs.createWriteStream(__dirname + '/sbot.log', { flags: 'a' })
-  process.stderr.pipe(parser).pipe(log)
+  sbot.stderr.pipe(parser).pipe(log)
+
+  sbot.stdout.pipe(match(/.*info.*listening.*/i, setupRpc)).pipe(process.stdout)
+
+  function setupRpc() {
+    info('connecting to sbot rpc..')
+    createClient(function (err, client) {
+      if (err) {
+        warn('failed to create rpc client', err)
+        warn('retrying in', config.rpc_reconnect_timer, 'ms')
+        return setTimeout(setupRpc, config.rpc_reconnect_timer)
+      }
+      info('connected to sbot rpc')
+      rpcClient = client
+    })
+  }
 
   sbot.on('close', function (code) {
     error('sbot exited (' + code + ')')
@@ -52,7 +74,9 @@ function start(startupMessage) {
 
   function postMessage(msg, cb) {
     info('posting', JSON.stringify(msg))
-    rpcAdd(msg, cb)
+    if (rpcClient !== null) return rpcClient.add(msg, cb)
+    warn('tried to post but rpc client not connected!')
+    process.nextTick(cb)
   }
 
   function sample() {
@@ -68,6 +92,7 @@ function start(startupMessage) {
 
   function postSample() {
     postTimer = setTimeout(function () {
+      if (!lastSample) return postSample()
       var msg = { type: 'sys-stat', text: lastSample }
       postMessage(msg, function (err) {
         if (err) error(err)
@@ -107,6 +132,10 @@ function start(startupMessage) {
 
 function info() {
   output('green').apply(null, arguments)
+}
+
+function warn() {
+  output('yellow').apply(null, arguments)
 }
 
 function error() {

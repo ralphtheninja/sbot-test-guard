@@ -22,6 +22,7 @@
   "dependencies": {
     "after": "^0.8.1",
     "chalk": "^0.5.1",
+    "match-through": "^1.0.2",
     "rc": "^0.6.0",
     "readable-stream": "^1.0.33",
     "scuttlebot": "^2.3.2",
